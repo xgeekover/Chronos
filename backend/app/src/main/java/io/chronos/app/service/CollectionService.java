@@ -78,8 +78,14 @@ public class CollectionService {
                 ? n.longValue()
                 : Long.parseLong(String.valueOf(cfg.getOrDefault("timeoutMs", "10000")));
 
-        var dc = new io.chronos.api.adapter.DeviceConfig(
-                adapterType, params, new io.chronos.api.adapter.Secrets(secrets));
+        // A device-read node may reference a globally-registered Device instead of carrying inline
+        // credentials. Reusing the device means all such nodes share one connection pool (keyed by
+        // url+user in the adapter), so DB sessions stay centralized and bounded — not one per node.
+        String deviceId = String.valueOf(cfg.getOrDefault("deviceId", "")).trim();
+        io.chronos.api.adapter.DeviceConfig dc = deviceId.isEmpty()
+                ? new io.chronos.api.adapter.DeviceConfig(
+                        adapterType, params, new io.chronos.api.adapter.Secrets(secrets))
+                : devices.toDeviceConfig(devices.get(java.util.UUID.fromString(deviceId)));
         var req = new io.chronos.api.adapter.CollectRequest(
                 "flow", "flow", type, definition, java.time.Duration.ofMillis(timeoutMs));
         var raw = pipeline.readOnce(dc, req);

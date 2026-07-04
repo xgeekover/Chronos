@@ -47,6 +47,12 @@ public class DeviceController {
         return service.list();
     }
 
+    /** Live connection-pool status (active/idle/total per pooled DB). Literal path beats /{id}. */
+    @GetMapping("/pools")
+    public List<Map<String, Object>> pools() {
+        return service.poolStats();
+    }
+
     @GetMapping("/{id}")
     public DeviceEntity get(@PathVariable UUID id) {
         return service.get(id);

@@ -49,10 +49,15 @@ A web admin UI at **http://localhost:8088** with these views:
   - *sequence*: `split`, `join`, `sort`, `batch`
   - *parser*: `csv`, `json`, `xml`, `yaml`, `html`
   - *storage*: `file out`, `tag` (writes a value into the historian), `device read` (runs any pull
-    adapter — JDBC/Modbus/shell/… — mid-flow)
+    adapter — JDBC/Modbus/shell/… — mid-flow; can **reference a globally-registered device** so
+    every node/task sharing that source shares one bounded connection pool)
 
   A right slide-out **Inspector** streams live debug messages (with a collapsible JSON tree), flow
   context variables, per-node info, and pipeline health.
+- **Devices** — manage globally-registered data sources: register/test connections, view the
+  scheduled collection tasks, and monitor **live connection pools** (active / idle / total, bounded
+  by each device's max pool size). Registering a device once and referencing it from flow
+  `device read` nodes keeps DB sessions centralized and capped — no per-node session sprawl.
 - **Tags** — an Obsidian-style folder tree (tag names split on `/`) with live values; drag a tag
   between folders; create storage nodes (retention groups) and tags.
 - **Time Machine** — a point-in-time snapshot slider plus a 24 h range chart (ECharts) over the
@@ -239,16 +244,19 @@ Under the `prod` Spring profile the app **refuses to start** if `CHRONOS_JWT_SEC
 ## Usage walkthrough
 
 1. **Sign in** at http://localhost:8088 (`admin` / `admin`).
-2. **Create a storage node** on the **Tags** page (a retention group), then add tags to it.
-3. **Author a flow** on the **Flows** page. A minimal historian pipeline:
-   `inject` → `device read` (e.g. a JDBC query) → `Function (JS)` (extract a value) →
-   `tag` (write into a historian tag). Click **Deploy & run**, then the ▸ button on the inject node
-   fires a message (only fires while the flow is deployed).
-4. **Watch it flow** — open the Inspector (bug tab on the right edge) to see live debug messages;
+2. **Register a device** on the **Devices** page (e.g. a JDBC source: name + `jdbcUrl` +
+   credentials + max pool size), then **Test** the connection. Its pool appears under
+   *Connection pools*.
+3. **Create a storage node** on the **Tags** page (a retention group), then add tags to it.
+4. **Author a flow** on the **Flows** page. A minimal historian pipeline:
+   `inject` → `device read` (pick the registered device → shared pool) → `Function (JS)` (extract a
+   value) → `tag` (write into a historian tag). Click **Deploy & run**, then the ▸ button on the
+   inject node fires a message (only fires while the flow is deployed).
+5. **Watch it flow** — open the Inspector (bug tab on the right edge) to see live debug messages;
    objects render as a collapsible JSON tree.
-5. **See stored data** — the **Dashboard** shows current values; **Time Machine** scrubs a
+6. **See stored data** — the **Dashboard** shows current values; **Time Machine** scrubs a
    point-in-time snapshot and charts a tag's last 24 h.
-6. **Consume externally** — a gateway client (Java/Python/.NET SDK) presents `CHRONOS_GATEWAY_TOKEN`,
+7. **Consume externally** — a gateway client (Java/Python/.NET SDK) presents `CHRONOS_GATEWAY_TOKEN`,
    subscribes by tag name over the WebSocket, and receives compressed protobuf frames on each update.
 
 RBAC: reads need any role; operational actions (run task, etc.) need **OPERATOR**+; all config

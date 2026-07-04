@@ -24,6 +24,7 @@ import "@xyflow/react/dist/style.css";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import {
   api,
+  type Device,
   type DiffResult,
   type FileChange,
   type FlowMetrics,
@@ -1167,6 +1168,18 @@ function FlowEditor() {
   const deployedGraph = useRef<Map<string, string>>(new Map()); // flowId → last-deployed graph JSON
   const [brokers, setBrokers] = useState<Broker[]>(loadBrokers);
   const [brokersOpen, setBrokersOpen] = useState(false);
+  // globally-registered devices — a device-read node can reference one (shared connection pool)
+  const [devices, setDevices] = useState<Device[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api
+      .listDevices()
+      .then((d) => alive && setDevices(d))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [globalEnv, setGlobalEnv] = useState<Record<string, string>>(loadEnv);
   const [envOpen, setEnvOpen] = useState(false);
   const [configs, setConfigs] = useState<SharedConfig[]>(loadConfigs);
@@ -2279,6 +2292,7 @@ function FlowEditor() {
         <FlowEditDialog
           node={editNode}
           brokers={brokers}
+          devices={devices}
           allNodes={rfNodes}
           configs={configs}
           onChange={update}
@@ -3017,6 +3031,7 @@ function L({ label, children }: { label: string; children: React.ReactNode }) {
 function FlowEditDialog({
   node,
   brokers,
+  devices,
   allNodes,
   configs,
   onChange,
@@ -3025,6 +3040,7 @@ function FlowEditDialog({
 }: {
   node: Node;
   brokers: Broker[];
+  devices: Device[];
   allNodes: Node[];
   configs: SharedConfig[];
   onChange: (c: Cfg) => void;
@@ -3211,7 +3227,21 @@ function FlowEditDialog({
       )}
       {t === "deviceread" && (
         <>
-          <div className="flex gap-2">
+          <L label="device (registered — shared connection pool)">
+            <select
+              className={inp}
+              value={String(c.deviceId ?? "")}
+              onChange={(e) => set("deviceId", e.target.value)}
+            >
+              <option value="">— inline config —</option>
+              {devices.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name} ({d.adapterType})
+                </option>
+              ))}
+            </select>
+          </L>
+          {!String(c.deviceId ?? "").trim() && (
             <L label="adapter">
               <select
                 className={inp}
@@ -3225,46 +3255,59 @@ function FlowEditDialog({
                 )}
               </select>
             </L>
-            <L label="task type">
-              <select
-                className={inp}
-                value={String(c.taskType ?? "QUERY")}
-                onChange={(e) => set("taskType", e.target.value)}
-              >
-                {[
-                  "QUERY",
-                  "MODBUS_READ",
-                  "SHELL",
-                  "FILE_READ",
-                  "SCRIPT_JAVA",
-                ].map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
-              </select>
-            </L>
-          </div>
-          <KeyValueEditor
-            label="params (e.g. jdbcUrl, host, port)"
-            value={c.params as Record<string, string> | undefined}
-            onChange={(p) => set("params", p)}
-          />
+          )}
+          <L label="task type">
+            <select
+              className={inp}
+              value={String(c.taskType ?? "QUERY")}
+              onChange={(e) => set("taskType", e.target.value)}
+            >
+              {[
+                "QUERY",
+                "MODBUS_READ",
+                "SHELL",
+                "FILE_READ",
+                "SCRIPT_JAVA",
+              ].map((o) => (
+                <option key={o}>{o}</option>
+              ))}
+            </select>
+          </L>
+          {!String(c.deviceId ?? "").trim() && (
+            <KeyValueEditor
+              label="params (e.g. jdbcUrl, host, port)"
+              value={c.params as Record<string, string> | undefined}
+              onChange={(p) => set("params", p)}
+            />
+          )}
           <KeyValueEditor
             label="definition (e.g. query, registerType, address)"
             value={c.definition as Record<string, string> | undefined}
             onChange={(d) => set("definition", d)}
           />
-          <KeyValueEditor
-            label="secrets (e.g. password) — encrypted at rest"
-            value={c.secrets as Record<string, string> | undefined}
-            onChange={(s) => set("secrets", s)}
-          />
+          {!String(c.deviceId ?? "").trim() && (
+            <KeyValueEditor
+              label="secrets (e.g. password) — encrypted at rest"
+              value={c.secrets as Record<string, string> | undefined}
+              onChange={(s) => set("secrets", s)}
+            />
+          )}
           {text("timeout (ms)", "timeoutMs")}
-          <p className="text-[10px] leading-relaxed text-zinc-500">
-            Runs the adapter on each incoming message → emits the raw result
-            (rows / text). Wire an <span className="font-mono">inject</span>{" "}
-            timer in to poll, then a <span className="font-mono">tag</span> node
-            to store — this is a full Pipeline collection expressed as a flow.
-          </p>
+          {String(c.deviceId ?? "").trim() ? (
+            <p className="text-[10px] leading-relaxed text-emerald-400/80">
+              Using a registered device — adapter, connection params &amp;
+              credentials come from it, and every node/task on that device
+              shares one bounded connection pool. Put the query/registers in{" "}
+              <span className="font-mono">definition</span>.
+            </p>
+          ) : (
+            <p className="text-[10px] leading-relaxed text-zinc-500">
+              Runs the adapter on each incoming message → emits the raw result
+              (rows / text). Wire an <span className="font-mono">inject</span>{" "}
+              timer in to poll, then a <span className="font-mono">tag</span>{" "}
+              node to store — a full collection pipeline expressed as a flow.
+            </p>
+          )}
         </>
       )}
       {t === "udpin" && text("listen port", "port")}

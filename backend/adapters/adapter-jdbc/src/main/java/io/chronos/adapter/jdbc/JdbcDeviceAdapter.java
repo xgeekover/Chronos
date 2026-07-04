@@ -111,6 +111,25 @@ public class JdbcDeviceAdapter implements DeviceAdapter {
     }
 
     @Override
+    public List<Map<String, Object>> poolStats() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (HikariDataSource ds : pools.values()) {
+            var mx = ds.getHikariPoolMXBean();
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("adapter", "JDBC");
+            m.put("url", ds.getJdbcUrl());
+            m.put("user", ds.getUsername());
+            m.put("max", ds.getMaximumPoolSize());
+            m.put("active", mx == null ? 0 : mx.getActiveConnections());
+            m.put("idle", mx == null ? 0 : mx.getIdleConnections());
+            m.put("total", mx == null ? 0 : mx.getTotalConnections());
+            m.put("awaiting", mx == null ? 0 : mx.getThreadsAwaitingConnection());
+            out.add(m);
+        }
+        return out;
+    }
+
+    @Override
     public void close() {
         pools.values().forEach(HikariDataSource::close);
         pools.clear();

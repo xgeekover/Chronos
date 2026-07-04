@@ -9,6 +9,7 @@ import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { type Auth, api, canOperate, clearAuth, getAuth } from "./api/client";
 import { Login } from "./features/auth/Login";
 import { DebugPanel } from "./features/debug/DebugPanel";
+import { Devices } from "./features/devices/Devices";
 import { Logs } from "./features/logs/Logs";
 import { TagsTree } from "./features/tags/TagsTree";
 import {
@@ -36,7 +37,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchInterval: 5000 } },
 });
 
-type View = "dashboard" | "flows" | "tags" | "timemachine" | "logs";
+type View = "dashboard" | "flows" | "devices" | "tags" | "timemachine" | "logs";
 
 // minimal inline icons (no icon dependency)
 function Icon({ path }: { path: string }) {
@@ -56,6 +57,8 @@ function Icon({ path }: { path: string }) {
 const ICONS: Record<View, string> = {
   dashboard: "M4 13h6V4H4zM14 20h6V4h-6zM4 20h6v-5H4z",
   flows: "M5 6h4v4H5zM15 14h4v4h-4zM9 8h3a3 3 0 0 1 3 3v3M9 8h6M15 16H9",
+  devices:
+    "M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
   tags: "M3 7h7l4 4-7 7-8-8zM7 7h.01",
   timemachine: "M12 8v4l3 2M21 12a9 9 0 1 1-3-6.7L21 7",
   logs: "M4 6h16M4 12h16M4 18h10",
@@ -235,6 +238,7 @@ function Dashboard() {
 const NAV: { id: View; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "flows", label: "Flows" },
+  { id: "devices", label: "Devices" },
   { id: "tags", label: "Tags" },
   { id: "timemachine", label: "Time Machine" },
   { id: "logs", label: "Logs" },
@@ -243,6 +247,7 @@ const NAV: { id: View; label: string }[] = [
 const TITLES: Record<View, string> = {
   dashboard: "Dashboard",
   flows: "Flows",
+  devices: "Devices",
   tags: "Tags",
   timemachine: "Time Machine",
   logs: "Collection logs",
@@ -282,6 +287,7 @@ function Shell({ auth, onLogout }: { auth: Auth; onLogout: () => void }) {
   let content: ReactNode = null;
   if (view === "dashboard") content = <Dashboard />;
   else if (view === "flows") content = <Flows />;
+  else if (view === "devices") content = <Devices />;
   else if (view === "tags") content = <TagsTree />;
   else if (view === "timemachine") content = <TimeMachine now={now} />;
   else content = <Logs />;

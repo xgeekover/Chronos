@@ -99,6 +99,11 @@ public class DeviceService {
                 new Secrets(cipher.decrypt(d.getConnectionConfigEnc())));
     }
 
+    /** Live connection-pool stats across every loaded adapter (for the Devices management view). */
+    public List<Map<String, Object>> poolStats() {
+        return plugins.all().stream().flatMap(a -> a.poolStats().stream()).toList();
+    }
+
     /** Run the adapter's connection test (§10 "접속테스트"). Not @Transactional: the OK/ERROR status
      *  must be committed even when the test fails (a rollback would discard the ERROR write). */
     public void validate(UUID id) {

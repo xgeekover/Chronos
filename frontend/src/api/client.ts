@@ -9,6 +9,18 @@ export interface Device {
   connectionConfigMeta?: Record<string, unknown>; // non-sensitive params (jdbcUrl, mode, …)
 }
 
+// Live connection-pool status (one per pooled DB), for the Devices management view.
+export interface Pool {
+  adapter: string;
+  url: string;
+  user: string;
+  max: number;
+  active: number;
+  idle: number;
+  total: number;
+  awaiting: number;
+}
+
 export interface Node {
   id: string;
   name: string;
@@ -187,6 +199,9 @@ export const api = {
   deleteTask: (id: string) => http<void>(`/tasks/${id}`, { method: "DELETE" }),
   deleteDevice: (id: string) =>
     http<void>(`/devices/${id}`, { method: "DELETE" }),
+  validateDevice: (id: string) =>
+    http<{ status: string }>(`/devices/${id}/validate`, { method: "POST" }),
+  devicePools: () => http<Pool[]>("/devices/pools"),
   createMapping: (taskId: string, body: unknown) =>
     http<Mapping>(`/tasks/${taskId}/mappings`, {
       method: "POST",

@@ -1,5 +1,7 @@
 package io.chronos.api.adapter;
 
+import java.util.List;
+import java.util.Map;
 import org.pf4j.ExtensionPoint;
 
 /**
@@ -35,5 +37,13 @@ public interface DeviceAdapter extends ExtensionPoint {
     /** Release pooled connections/sessions. Called on plugin stop. */
     default void close() {
         // no-op by default
+    }
+
+    /**
+     * Live connection-pool stats, one entry per pooled connection (empty for adapters that don't
+     * pool). Surfaced by the Devices management view so operators can see and bound DB sessions.
+     */
+    default List<Map<String, Object>> poolStats() {
+        return List.of();
     }
 }

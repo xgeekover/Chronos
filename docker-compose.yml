@@ -51,9 +51,6 @@ services:
       CHRONOS_HISTORY_DIR: /data/history
       CHRONOS_PROJECTS_DIR: /data/projects   # git repos for flow versioning (Projects feature)
       CHRONOS_FLOW_FILES_DIR: /data/flow-files  # sandbox dir for the file in/out flow nodes
-      # Alarm notification channels — empty = channel off (set to enable WEBHOOK / NTFY delivery).
-      CHRONOS_ALARM_WEBHOOK_URL: ${CHRONOS_ALARM_WEBHOOK_URL:-}
-      CHRONOS_ALARM_NTFY_URL: ${CHRONOS_ALARM_NTFY_URL:-}
       # OpenTelemetry — off by default; enable with the `observability` profile (see below):
       #   OTEL_ENABLED=true docker compose --profile observability up -d --build
       OTEL_ENABLED: ${OTEL_ENABLED:-false}

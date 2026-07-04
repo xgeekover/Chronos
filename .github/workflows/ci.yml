@@ -17,11 +17,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
       # ubuntu-latest ships Docker, so the Testcontainers-based tests run here.
+      # (Heavy Oracle/MS-SQL E2E runs separately in heavy-db.yml — weekly + manual — to keep this fast.)
       - name: Build & test
         run: ./gradlew build --console=plain --no-daemon
-      # Heavy DB E2E (Oracle, MS-SQL) — excluded from the default build; amd64 runners run them natively.
-      - name: Heavy DB E2E
-        run: ./gradlew heavyDbTest --console=plain --no-daemon
 
   frontend:
     name: Frontend (lint + build + test)

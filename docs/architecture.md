@@ -19,7 +19,7 @@ agreed in Phase 0.
  [ Current-value cache ]  [ Node-local TS DB ]  [ WS broadcast ]
   (real-time dashboard)    (Time Machine, SQLite/node)
 
- [ Platform metadata DB ] = Device/Node/Tag/Task/Alarm/Audit config (PostgreSQL)
+ [ Platform metadata DB ] = Device/Node/Tag/Task/Flow/Audit config (PostgreSQL)
 ```
 
 ## Invariant rules
@@ -92,13 +92,10 @@ Adapters must never depend on `core-engine`/`app` (invariant rule 2). This is wh
   **Java SDK** (subscribe / getValue / getSnapshot by tag name) verified E2E against the live
   gateway; **Python SDK** verified (codec tests + live push demo); **.NET SDK** delivered as
   source (no local toolchain). Each SDK has a 5-line Quickstart. ✅
-- **Phase 6** — dashboard / logs / alarms: per-run `collection_log` persistence + logs API;
-  `AlarmRule` CRUD + threshold evaluation on each collected value → `alarm_event` history;
-  notification channels (WEBHOOK + NTFY via HTTP, EMAIL stub, UI stored); dashboard summary
-  (counts + collection success rate + open alarms). FE gains Logs + Alarms tabs and a summary
-  banner. ✅ verified by tests + a live demo (script run → alarm fires → webhook delivered →
-  logged → dashboard).
-- **Phase 7** — hardening / deploy: **Micrometer + Prometheus** metrics (collections, alarms,
+- **Phase 6** — dashboard / logs: per-run `collection_log` persistence + logs API; dashboard
+  summary (inventory counts + collection success rate + live-value count). FE gains a Dashboard
+  and a Logs view. ✅ verified by tests + a live demo (script run → logged → dashboard).
+- **Phase 7** — hardening / deploy: **Micrometer + Prometheus** metrics (collections,
   gateway subscriptions) at `/actuator/prometheus`; **Spring Security** HTTP Basic over `/api/**`
   (health/prometheus + gateway WS open); **docker-compose** packaging (postgres + backend image +
   frontend nginx with `/api`,`/ws` proxy, healthchecks, graceful shutdown); a concurrent

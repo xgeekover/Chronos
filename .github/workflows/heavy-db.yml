@@ -1,0 +1,23 @@
+name: Heavy DB E2E
+
+# Oracle + MS-SQL end-to-end tests use large emulated container images, so they run on a weekly
+# schedule and on manual dispatch instead of on every push — keeping the main CI (ci.yml) fast.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  heavy-db:
+    name: Oracle + MS-SQL E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      - name: Heavy DB E2E
+        run: ./gradlew heavyDbTest --console=plain --no-daemon

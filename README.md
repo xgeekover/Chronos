@@ -316,3 +316,9 @@ docker compose build backend  && docker compose up -d backend
 - The `file in` / `file out` nodes are confined to `CHRONOS_FLOW_FILES_DIR` (symlink-escape guarded).
 
 See [`docs/security.md`](docs/security.md) for the full posture.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).

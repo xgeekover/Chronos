@@ -10,6 +10,11 @@ to live values over a **WebSocket + protobuf gateway** with Java / Python / .NET
 Data flows are authored visually in a **Node-RED-style flow editor** — drag nodes from a categorized
 palette, wire them, and deploy. New protocols are added as **PF4J plugins** without touching the core.
 
+<p align="center">
+  <img src="docs/screenshots/views/flows.png" alt="Chronos Flows editor — a Node-RED-style visual flow canvas with a categorized node palette, wired inject → debug nodes, toolbar, and minimap" width="900">
+</p>
+<p align="center"><em>The Flows editor — Chronos's primary authoring surface.</em></p>
+
 > Design & rationale: [`docs/architecture.md`](docs/architecture.md) ·
 > Extending it: [`docs/adding-a-protocol.md`](docs/adding-a-protocol.md) ·
 > Security posture: [`docs/security.md`](docs/security.md)
@@ -18,57 +23,116 @@ palette, wire them, and deploy. New protocols are added as **PF4J plugins** with
 
 ## Table of contents
 
-- [What you get](#what-you-get)
+- [Screens — a visual tour](#screens--a-visual-tour)
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
 - [Quick start (Docker)](#quick-start-docker)
 - [Local development](#local-development)
 - [Configuration](#configuration)
 - [Ports](#ports)
-- [Usage walkthrough](#usage-walkthrough)
+- [Build your first flow](#build-your-first-flow)
+- [Node reference](#node-reference)
 - [Project layout](#project-layout)
 - [Build & test](#build--test)
 - [Security](#security)
 
 ---
 
-## What you get
+## Screens — a visual tour
 
-A web admin UI at **http://localhost:8088** with these views:
+A single web admin UI at **http://localhost:8088**. Switch views from the hamburger menu
+(**Dashboard · Flows · Devices · Tags · Time Machine · Logs**); the bug icon on the right edge opens
+the **Inspector**. Everything is **code-split** — the flow canvas, charts, and code editor load on
+demand — and the frontend polls live data so the numbers move on their own.
 
-- **Dashboard** — live KPIs (success rate, collections, live-value count, device count), device /
-  node / task inventory, and a live current-values table (auto-refresh every 5 s). Single-screen
-  layout with per-panel scrolling.
-- **Flows** — a Node-RED-style visual editor (React Flow) and the primary authoring surface. Drag
-  nodes from a categorized palette (**Common / Function / Network / Sequence / Parser / Storage**),
-  wire them, double-click to configure, and **Deploy** to run. Nodes include:
-  - *inputs*: `inject`, `http in`, `mqtt in`, `tcp in`, `udp in`, `websocket in`, `file in`
-  - *function*: `Function (JS/Java)`, `switch`, `change`, `range`, `template`, `delay`, `trigger`,
-    `filter (rbe)`, `exec`
-  - *network*: `http request`, `soap`, and the `*out` senders (mqtt / tcp / udp / websocket)
-  - *sequence*: `split`, `join`, `sort`, `batch`
-  - *parser*: `csv`, `json`, `xml`, `yaml`, `html`
-  - *storage*: `file out`, `tag` (writes a value into the historian), `device read` (runs any pull
-    adapter — JDBC/Modbus/shell/… — mid-flow; can **reference a globally-registered device** so
-    every node/task sharing that source shares one bounded connection pool)
+### Sign in
 
-  A right slide-out **Inspector** streams live debug messages (with a collapsible JSON tree), flow
-  context variables, per-node info, and pipeline health.
-- **Devices** — manage globally-registered data sources: register/test connections, view the
-  scheduled collection tasks, and monitor **live connection pools** (active / idle / total, bounded
-  by each device's max pool size). Registering a device once and referencing it from flow
-  `device read` nodes keeps DB sessions centralized and capped — no per-node session sprawl.
-- **Tags** — an Obsidian-style folder tree (tag names split on `/`) with live values; drag a tag
-  between folders; create storage nodes (retention groups) and tags.
-- **Time Machine** — a point-in-time snapshot slider plus a 24 h range chart (ECharts) over the
-  per-node history store.
-- **Logs** — collection-run history.
+JWT-backed auth with three roles. Your role drives **RBAC**: reads need any role, operational actions
+need OPERATOR+, and all config writes need ADMIN — the UI disables controls your role can't use.
 
-The **Function** node runs sandboxed JavaScript (GraalVM, Node-RED-style `msg`/`node`/`flow`/
-`global`/`env`) **or** Java (compiled in-memory), with live per-language syntax checking in a
-CodeMirror editor.
+![Chronos login screen](docs/screenshots/views/login.png)
 
-The frontend is **code-split** — heavy views (flow canvas, charts, code editor) load on demand.
+### Dashboard — everything at a glance
+
+Top **KPI cards** (success rate, total collections, live-value count, device count), a large
+**live-values table** (tag · value · quality), and a right rail of **device / node / task** inventory.
+It's a single screen with per-panel scrolling and a 5-second auto-refresh.
+
+![Chronos Dashboard — KPI cards across the top, a live values table on the left, and a devices/nodes/tasks rail on the right](docs/screenshots/views/dashboard.png)
+
+### Flows — the visual editor (primary authoring surface)
+
+A Node-RED-style canvas. Drag nodes from the **left palette** onto the canvas, **wire** outputs to
+inputs, **double-click** a node to configure it, and **Deploy & run** from the toolbar.
+
+- The palette is grouped into collapsible, searchable categories — **Common / Function / Network /
+  Sequence / Parser / Storage**.
+- Toolbar: Deploy target (this / all / modified), Stop, Check (validate), Undo/Redo, Group, Brokers,
+  Env, Configs, History, Disable, Export/Import.
+- Delete a wire with the **✕** at its midpoint; the bottom-right **minimap** colors nodes by type.
+
+![Chronos Flows editor showing the palette, canvas with an inject → debug flow, deploy toolbar and minimap](docs/screenshots/views/flows.png)
+
+<details>
+<summary><strong>Palette close-up</strong> — the categorized, searchable node rail</summary>
+
+<p align="center"><img src="docs/screenshots/views/palette.png" alt="Chronos node palette rail with Common, Function, Network categories" width="220"></p>
+
+</details>
+
+### Devices — data sources & connection pools
+
+Register global data sources once, test their connections, and monitor **live connection pools**.
+
+- **Devices** — the registered sources (adapter · status), `Test` (probe the connection), delete.
+- **Connection pools** — active / idle / total / max connections per pool (3-second refresh); a
+  warning shows if requests start waiting.
+- **Scheduled collection tasks** — the Quartz-scheduled pulls, with `Run` (fire now) / delete.
+- **New device** — register a source. JDBC gets dedicated fields (jdbcUrl / credentials / max pool);
+  others use `params` / `secrets` (JSON).
+
+Register a device once, then reference it from flow `device read` nodes so every node and task sharing
+that source **shares one bounded pool** — no per-node session sprawl.
+
+![Chronos Devices view — registered devices, live connection pools, and scheduled collection tasks](docs/screenshots/views/devices.png)
+
+### Tags — the tag tree & live values
+
+Tag names split on `/` into an **Obsidian-style folder tree** with live values alongside. Drag a tag
+between folders (ADMIN); create **storage nodes** (retention groups) and **tags** on the right.
+
+- Put `/` in a tag name to create folders (e.g. `line2/sensors/flow`).
+- A storage node bundles tags and sets their Time Machine retention (in hours).
+
+![Chronos Tags view — a folder tree of tags on the left with live values, node/tag creation on the right](docs/screenshots/views/tags.png)
+
+### Time Machine — query the past
+
+A left-hand **snapshot** (a 24-hour slider that shows every tag's value at a chosen instant) beside a
+right-hand **range chart** (a single tag's last 24 hours, drawn with ECharts) over the per-node history
+store.
+
+- Drag the slider and the snapshot table jumps to that moment in time.
+- Pick the charted tag from the top-right dropdown.
+
+![Chronos Time Machine — a point-in-time snapshot slider on the left and a 24-hour range chart on the right](docs/screenshots/views/timemachine.png)
+
+### Inspector — debug & context side panel
+
+The bug icon on the right edge slides out a panel with tabs:
+
+- **Debug** — messages that reached a `debug` node, newest first; objects render as a **collapsible
+  JSON tree** (JSON strings are auto-parsed). Filter by topic / value.
+- **System** — flow deploy history + collection-run log (pipeline health).
+- **Info** — the type, help and settings of the node selected on the canvas.
+- **Context** — variables a Function node stored via `flow.set` / `global.set`.
+
+![Chronos Inspector panel — a streaming debug feed with a collapsible JSON tree](docs/screenshots/views/inspector.png)
+
+### Logs
+
+Collection-run history — success / failure, duration, tag count and error for every scheduled or
+manual collection. (This is the one view that uses page scrolling.)
 
 ---
 
@@ -110,6 +174,18 @@ Chronos is a **Gradle multi-module** backend plus a React SPA, wired together on
 **Storage split** — metadata (devices, nodes, tags, tasks, mappings, users, saved flows) lives in
 **PostgreSQL** (schema managed by **Flyway**); the time-series history for each node is a local
 **SQLite** database under `CHRONOS_HISTORY_DIR` (the "Time Machine").
+
+**Core concepts**
+
+| Term | Meaning |
+|------|---------|
+| **Device** | One data source (DB / file / MQTT / …). Registered globally and reused; credentials encrypted at rest. |
+| **Node** | A *storage* group for tags (the retention unit) — distinct from a *flow* node. |
+| **Tag** | A single value keyed `node.tag` (e.g. `line1.temp`), stored as a time series. |
+| **Task** | A Quartz-scheduled collection job that reads a device periodically. |
+| **Flow** | A graph of wired nodes that processes data; runs in the runtime once deployed. |
+| **Time Machine** | The per-node local SQLite time-series store (snapshot / range queries). |
+| **Gateway** | The WebSocket + protobuf endpoint external clients subscribe to by tag name. |
 
 ---
 
@@ -241,26 +317,285 @@ Under the `prod` Spring profile the app **refuses to start** if `CHRONOS_JWT_SEC
 
 ---
 
-## Usage walkthrough
+## Build your first flow
 
-1. **Sign in** at http://localhost:8088 (`admin` / `admin`).
-2. **Register a device** on the **Devices** page (e.g. a JDBC source: name + `jdbcUrl` +
-   credentials + max pool size), then **Test** the connection. Its pool appears under
-   *Connection pools*.
-3. **Create a storage node** on the **Tags** page (a retention group), then add tags to it.
-4. **Author a flow** on the **Flows** page. A minimal historian pipeline:
-   `inject` → `device read` (pick the registered device → shared pool) → `Function (JS)` (extract a
-   value) → `tag` (write into a historian tag). Click **Deploy & run**, then the ▸ button on the
-   inject node fires a message (only fires while the flow is deployed).
-5. **Watch it flow** — open the Inspector (bug tab on the right edge) to see live debug messages;
-   objects render as a collapsible JSON tree.
-6. **See stored data** — the **Dashboard** shows current values; **Time Machine** scrubs a
-   point-in-time snapshot and charts a tag's last 24 h.
-7. **Consume externally** — a gateway client (Java/Python/.NET SDK) presents `CHRONOS_GATEWAY_TOKEN`,
-   subscribes by tag name over the WebSocket, and receives compressed protobuf frames on each update.
+The minimal historian pipeline — **read a value from a source → store it in a tag → see it on
+screen**. This example reads a temperature from a JDBC database into the `line1.temp` tag.
 
-RBAC: reads need any role; operational actions (run task, etc.) need **OPERATOR**+; all config
-writes need **ADMIN**. The UI disables controls the current role can't use.
+**1. Register a device** (Devices → **New device**): name `plant-db`, adapter `JDBC`,
+`jdbcUrl` `jdbc:postgresql://host:5432/db`, credentials, max pool `4` → **Register device** →
+**Test** (status `OK`). Its pool appears under *Connection pools*.
+
+**2. Create a storage node & tag** (Tags): **New node** `line1`, retention `48` (hours) →
+**Add node**; then **New tag** name `temp`, type `NUMBER` → **Add tag**. This creates the
+`line1.temp` tag (its canonicalKey).
+
+**3. Author the flow** (Flows) — drag and wire:
+
+```
+inject ─▶ device read ─▶ function ─▶ tag ─▶ debug
+```
+
+- **inject** — interval `2000` (every 2 s) or `0` (manual ▸ only). The timer.
+- **device read** — pick `plant-db` in the **device** dropdown (shared pool), `sql` =
+  `SELECT temp FROM sensor`, task type `QUERY`.
+- **function (JS)** — pull one value out into the payload:
+  ```js
+  // device read emits an array of rows → take the first row's temp
+  msg.payload = msg.payload[0].temp;
+  return msg;
+  ```
+- **tag** — `line1.temp` (the canonicalKey from step 2).
+- **debug** — to watch the flow in the Inspector.
+
+**4. Deploy & run** — click **Deploy & run**. If `inject`'s interval is `0`, fire it manually with the
+node's **▸** button (only fires while the flow is deployed); at `2000` it auto-collects every 2 s.
+
+**5. Watch it flow** — open the Inspector (bug icon) → **Debug** tab; each message arrives newest-first
+and objects expand as a JSON tree.
+
+**6. See stored data** — the **Dashboard** current-values table shows `line1.temp`; **Time Machine**
+scrubs a point-in-time snapshot and charts its last 24 h.
+
+**7. Consume externally** — a gateway client (Java/Python/.NET SDK) presents `CHRONOS_GATEWAY_TOKEN`,
+subscribes by tag name over the WebSocket, and receives compressed protobuf frames on each update.
+
+> **Common gotchas** — `inject ▸` does nothing if the flow isn't **deployed** (deploy first). A `tag`
+> node erroring with *"no historian tag"* means the tag wasn't created in **Tags** yet. If a
+> `device read` opens its own connection, pick a **registered device** (not inline) so the pool is
+> shared.
+
+---
+
+## Node reference
+
+Every flow node and its configuration dialog. Double-click a node on the canvas to open the dialog
+shown here; common controls at the bottom of every dialog are **enabled** (skip on deploy),
+**shared config**, and **Delete / Done**.
+
+<details>
+<summary><strong>Common</strong> — entry points, debug, error/status hooks, virtual wires</summary>
+
+<table>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/inject.png" alt="inject node config dialog" width="300"></td>
+<td><b><code>inject</code></b> — Flow entry point. Fires a message every <code>interval</code> ms, or manually via the node's <b>▸</b> button (uncheck <i>auto-fire on deploy</i> for manual-only). The trigger for every poll — place it before <code>device read</code> / <code>http request</code>.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/debug.png" alt="debug node config dialog" width="300"></td>
+<td><b><code>debug</code></b> — Prints incoming messages to the Inspector's <b>Debug</b> tab; objects render as a collapsible JSON tree. A sink (no output) — branch it in anywhere.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/complete.png" alt="complete node config dialog" width="300"></td>
+<td><b><code>complete</code></b> — Fires when a watched node <i>finishes</i> handling a message — a post-processing hook (e.g. "notify once storage is done").</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/catch.png" alt="catch node config dialog" width="300"></td>
+<td><b><code>catch</code></b> — Catches errors thrown by watched nodes (details in <code>msg.error</code>) for error handling / alerting / fallback values.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/status.png" alt="status node config dialog" width="300"></td>
+<td><b><code>status</code></b> — Receives status events from watched nodes (<code>msg.status</code>), e.g. "broker connected / disconnected".</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/linkin.png" alt="link in node config dialog" width="300"></td>
+<td><b><code>Link in</code></b> — Receives messages a <code>Link out</code> sends over a virtual wire (jump with no drawn line) — keeps the canvas tidy.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/linkout.png" alt="link out node config dialog" width="300"></td>
+<td><b><code>Link out</code></b> — Sends to the targeted <code>Link in</code> nodes; in <i>return</i> mode, replies to a <code>Link call</code>.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/linkcall.png" alt="link call node config dialog" width="300"></td>
+<td><b><code>Link call</code></b> — Calls a <code>Link in</code>-started subroutine and resumes when a return-mode <code>Link out</code> responds — reuse common logic like a function.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/junction.png" alt="junction node config dialog" width="300"></td>
+<td><b><code>junction</code></b> — A pass-through wiring point that routes inputs unchanged — gather many wires into one to tidy routing.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/comment.png" alt="comment node config dialog" width="300"></td>
+<td><b><code>comment</code></b> — A canvas sticky note. Never deployed — just documents a stretch of flow.</td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><strong>Function</strong> — transform, branch and time messages</summary>
+
+<table>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/function.png" alt="function node config dialog" width="300"></td>
+<td><b><code>function</code></b> — Transforms the message with your own code: <b>sandboxed JavaScript</b> (GraalVM) or <b>Java</b> (compiled in-memory). Live per-language syntax checking in a CodeMirror editor; <code>msg</code>/<code>node</code>/<code>flow</code>/<code>global</code>/<code>env</code> in scope; multiple outputs via <code>node.send([...])</code>. No JVM/file/network access from JS.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/switch.png" alt="switch node config dialog" width="300"></td>
+<td><b><code>switch</code></b> — Routes the message to the output port whose rule matches (<code>==</code>, <code>!=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>contains</code>, <code>otherwise</code>, expression). Rules match top-down; #rules = #outputs.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/change.png" alt="change node config dialog" width="300"></td>
+<td><b><code>change</code></b> — Applies <b>set / change / delete / move</b> rules to message properties — simple transforms with no code.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/range.png" alt="range node config dialog" width="300"></td>
+<td><b><code>range</code></b> — Linearly scales a numeric property from one range to another (e.g. ADC <code>0–1023</code> → <code>0–100%</code>), with optional clamping.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/template.png" alt="template node config dialog" width="300"></td>
+<td><b><code>template</code></b> — Fills a <code>{{ }}</code> template and writes it to a property — assemble strings (alert text, URLs, queries).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/delay.png" alt="delay node config dialog" width="300"></td>
+<td><b><code>delay</code></b> — Delays each message by a fixed time — timing / rate control.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/trigger.png" alt="trigger node config dialog" width="300"></td>
+<td><b><code>trigger</code></b> — Emits the input immediately, then emits a set payload once after a delay — watchdog / auto-reset (e.g. "on" now, "reset" in n seconds).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/rbe.png" alt="filter (rbe) node config dialog" width="300"></td>
+<td><b><code>Filter (rbe)</code></b> — Passes a message only when the value <i>changed</i> (report-by-exception) — suppress duplicates, cut noise and load.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/exec.png" alt="exec node config dialog" width="300"></td>
+<td><b><code>exec</code></b> — Runs a system command → <code>stdout</code> (port 0), <code>stderr</code> (port 1), exit code (port 2). Shell mode needs a fixed command; <b>ADMIN-only</b> to deploy.</td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><strong>Network</strong> — receive, send and request over the wire</summary>
+
+<table>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/httpin.png" alt="HTTP in node config dialog" width="300"></td>
+<td><b><code>HTTP in</code></b> — Public webhook inlet — turns <code>POST /api/flows/in/&lt;path&gt;</code> requests into messages (unauthenticated by design). Pair with <code>HTTP response</code> to reply.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/httpresponse.png" alt="HTTP response node config dialog" width="300"></td>
+<td><b><code>HTTP response</code></b> — Replies to the paired <code>HTTP in</code> caller with <code>msg.payload</code>, a status code and headers.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/httprequest.png" alt="HTTP request node config dialog" width="300"></td>
+<td><b><code>HTTP request</code></b> — Makes an outbound HTTP request; response body → <code>msg.payload</code>, status → <code>msg.statusCode</code>. Override the URL with <code>msg.url</code>.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/mqttin.png" alt="MQTT in node config dialog" width="300"></td>
+<td><b><code>MQTT in</code></b> — Subscribes to a broker topic and fires a message on each arrival (compose ships a mosquitto broker).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/mqttout.png" alt="MQTT out node config dialog" width="300"></td>
+<td><b><code>MQTT out</code></b> — Publishes <code>msg.payload</code> to an MQTT topic.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/wsin.png" alt="WebSocket in node config dialog" width="300"></td>
+<td><b><code>WebSocket in</code></b> — Connects to a WebSocket URL and fires a message per text frame (auto-reconnect).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/wsout.png" alt="WebSocket out node config dialog" width="300"></td>
+<td><b><code>WebSocket out</code></b> — Sends <code>msg.payload</code> as a WebSocket text frame.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/tcpin.png" alt="TCP in node config dialog" width="300"></td>
+<td><b><code>TCP in</code></b> — Connects to <code>host:port</code> and fires a message per received line (auto-reconnect).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/tcpout.png" alt="TCP out node config dialog" width="300"></td>
+<td><b><code>TCP out</code></b> — Sends <code>msg.payload</code> (+ newline) to a TCP <code>host:port</code>.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/udpin.png" alt="UDP in node config dialog" width="300"></td>
+<td><b><code>UDP in</code></b> — Binds a UDP port and emits each received datagram as payload.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/udpout.png" alt="UDP out node config dialog" width="300"></td>
+<td><b><code>UDP out</code></b> — Sends <code>msg.payload</code> as a UDP datagram to <code>host:port</code>.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/soaprequest.png" alt="SOAP request node config dialog" width="300"></td>
+<td><b><code>SOAP request</code></b> — POSTs a templated SOAP envelope (<code>{{prop}}</code> substitution) to an endpoint — legacy SOAP integration.</td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><strong>Sequence</strong> — split, join, sort and batch messages</summary>
+
+<table>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/split.png" alt="split node config dialog" width="300"></td>
+<td><b><code>split</code></b> — Splits an array (or delimited string) into one message per element — process rows/values individually.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/join.png" alt="join node config dialog" width="300"></td>
+<td><b><code>join</code></b> — Collects N messages into a single array payload — the inverse of <code>split</code>.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/sort.png" alt="sort node config dialog" width="300"></td>
+<td><b><code>sort</code></b> — Sorts a list payload (asc/desc, numeric or lexical, optional key).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/batch.png" alt="batch node config dialog" width="300"></td>
+<td><b><code>batch</code></b> — Groups messages into one array — by count or by time interval — for bulk store/send.</td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><strong>Parser</strong> — format conversion</summary>
+
+<table>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/csv.png" alt="csv node config dialog" width="300"></td>
+<td><b><code>csv</code></b> — Splits a delimited string into a trimmed array of fields.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/json.png" alt="json node config dialog" width="300"></td>
+<td><b><code>json</code></b> — Converts a JSON string ↔ object (auto by payload type, or force parse/stringify).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/xml.png" alt="xml node config dialog" width="300"></td>
+<td><b><code>xml</code></b> — Converts an XML string ↔ nested object.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/yaml.png" alt="yaml node config dialog" width="300"></td>
+<td><b><code>yaml</code></b> — Converts a YAML string ↔ object (SnakeYAML 2.x — global tags rejected, safe).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/html.png" alt="html node config dialog" width="300"></td>
+<td><b><code>html</code></b> — Extracts elements from HTML by CSS selector (jsoup) — light scraping.</td>
+</tr>
+</table>
+
+</details>
+
+<details>
+<summary><strong>Storage</strong> — files, historian tags, and pulling from sources ★</summary>
+
+<table>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/filein.png" alt="file in node config dialog" width="300"></td>
+<td><b><code>File in</code></b> — Reads a file into <code>msg.payload</code>. Confined to <code>CHRONOS_FLOW_FILES_DIR</code> (symlink-escape guarded).</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/fileout.png" alt="file out node config dialog" width="300"></td>
+<td><b><code>File out</code></b> — Writes / appends / deletes a file (same sandbox) — log or export results.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/tag.png" alt="tag (historian) node config dialog" width="300"></td>
+<td><b><code>tag</code> ★</b> — Writes <code>msg.payload</code> into a <b>historian tag</b> (canonicalKey, e.g. <code>line1.temp</code>) → fans out to Time Machine + gateway, exactly like scheduled collection. The terminal node of a flow-authored pipeline. The tag must already exist in <b>Tags</b>.</td>
+</tr>
+<tr>
+<td width="320"><img src="docs/screenshots/nodes/deviceread.png" alt="device read node config dialog" width="300"></td>
+<td><b><code>device read</code> ★</b> — Runs a pull adapter (JDBC / Modbus / shell / file / API / Java script) on each incoming message and emits the raw result. Pick a <b>globally-registered device</b> to share one bounded connection pool (vs. inline config, which can fragment pools). <code>inject → device read → function → tag</code> is the canonical collection pattern.</td>
+</tr>
+</table>
+
+</details>
 
 ---
 
@@ -277,7 +612,7 @@ backend/
 frontend/          React 19 + Vite + Tailwind v4 + React Flow + CodeMirror + ECharts
 proto/             protobuf schema for the gateway wire format
 sdk/               sdk-java · sdk-python · sdk-dotnet
-docs/              architecture · adding-a-protocol · security
+docs/              architecture · adding-a-protocol · security · screenshots
 ```
 
 ---

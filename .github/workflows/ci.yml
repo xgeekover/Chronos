@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17" # Gradle toolchain picks this up; no foojay download needed in CI
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      # ubuntu-latest ships Docker, so the Testcontainers-based tests run here.
+      - name: Build & test
+        run: ./gradlew build --console=plain --no-daemon
+      # Heavy DB E2E (Oracle, MS-SQL) — excluded from the default build; amd64 runners run them natively.
+      - name: Heavy DB E2E
+        run: ./gradlew heavyDbTest --console=plain --no-daemon
+
+  frontend:
+    name: Frontend (lint + build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Enable pnpm
+        run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test

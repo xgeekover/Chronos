@@ -1,0 +1,106 @@
+# Phase 7 packaging (§11, §12): metadata DB + backend + frontend, separately deployable.
+# Build the backend boot jar first:  ./gradlew :app:bootJar
+# Then:  docker compose up --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: chronos-postgres
+    environment:
+      POSTGRES_DB: chronos
+      POSTGRES_USER: chronos
+      POSTGRES_PASSWORD: chronos
+    ports:
+      - "5432:5432"
+    volumes:
+      - chronos-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chronos"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # MQTT broker for the flow runtime's mqtt in/out nodes (reachable at tcp://mosquitto:1883).
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: chronos-mosquitto
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chronos-backend
+    restart: unless-stopped
+    mem_limit: 2g                       # bound the GraalVM/Truffle-heavy JVM
+    environment:
+      # cap heap to a fraction of the container limit so native/Truffle memory has headroom
+      JAVA_TOOL_OPTS: ${JAVA_TOOL_OPTS:--XX:MaxRAMPercentage=70.0}
+      CHRONOS_DB_URL: jdbc:postgresql://postgres:5432/chronos
+      CHRONOS_DB_USER: chronos
+      CHRONOS_DB_PASSWORD: chronos
+      CHRONOS_API_USER: ${CHRONOS_API_USER:-admin}
+      CHRONOS_API_PASSWORD: ${CHRONOS_API_PASSWORD:-admin}
+      CHRONOS_GATEWAY_TOKEN: ${CHRONOS_GATEWAY_TOKEN:-chronos-dev-token}
+      # Stable AES-GCM key so encrypted device credentials survive restarts (CHANGE in production).
+      CHRONOS_SECRET_KEY: ${CHRONOS_SECRET_KEY:-Y2hyb25vcy1kZXYtc2VjcmV0LWtleS0zMmJ5dGVzISE=}
+      # Stable HS256 secret so JWTs survive restarts (≥32 bytes; CHANGE in production).
+      CHRONOS_JWT_SECRET: ${CHRONOS_JWT_SECRET:-chronos-dev-jwt-secret-change-me-please-0123456789}
+      CHRONOS_HISTORY_DIR: /data/history
+      CHRONOS_PROJECTS_DIR: /data/projects   # git repos for flow versioning (Projects feature)
+      CHRONOS_FLOW_FILES_DIR: /data/flow-files  # sandbox dir for the file in/out flow nodes
+      # Alarm notification channels — empty = channel off (set to enable WEBHOOK / NTFY delivery).
+      CHRONOS_ALARM_WEBHOOK_URL: ${CHRONOS_ALARM_WEBHOOK_URL:-}
+      CHRONOS_ALARM_NTFY_URL: ${CHRONOS_ALARM_NTFY_URL:-}
+      # OpenTelemetry — off by default; enable with the `observability` profile (see below):
+      #   OTEL_ENABLED=true docker compose --profile observability up -d --build
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+    volumes:
+      - chronos-history:/data/history   # per-node SQLite Time-Machine files (§8)
+      - chronos-projects:/data/projects # git repos for flow versioning (Projects feature)
+      - chronos-flowfiles:/data/flow-files # file in/out flow-node sandbox
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    stop_grace_period: 30s              # honor graceful shutdown
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: chronos-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8088:80"
+
+  # ─── Observability stack (opt-in): OpenTelemetry Collector + Jaeger trace UI (§11) ───
+  # Enable with:  OTEL_ENABLED=true docker compose --profile observability up -d --build
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: chronos-otel-collector
+    profiles: ["observability"]
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4318:4318"   # OTLP HTTP (in)
+      - "8889:8889"   # collector-exported metrics (Prometheus scrape)
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: chronos-jaeger
+    profiles: ["observability"]
+    ports:
+      - "16686:16686"  # Jaeger UI
+
+volumes:
+  chronos-pg:
+  chronos-history:
+  chronos-projects:
+  chronos-flowfiles:

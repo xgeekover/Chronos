@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: chronos
+  datasource:
+    # Metadata DB (separate from any collected source DB, 불변 규칙 / §4). Configured via env.
+    url: ${CHRONOS_DB_URL:jdbc:postgresql://localhost:5432/chronos}
+    username: ${CHRONOS_DB_USER:chronos}
+    password: ${CHRONOS_DB_PASSWORD:chronos}
+  jpa:
+    hibernate:
+      ddl-auto: none      # schema is owned by Flyway, never by Hibernate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  quartz:
+    job-store-type: memory   # Phase 2; enabled tasks are re-scheduled from the DB on startup
+
+# Chronos engine settings (ADR-004/008/010)
+chronos:
+  history:
+    data-dir: ${CHRONOS_HISTORY_DIR:data/history}  # per-node SQLite files
+  projects:
+    dir: ${CHRONOS_PROJECTS_DIR:data/flow-projects}  # git repos for flow versioning (Node-RED Projects)
+  collection:
+    pool-size: 16
+  retention:
+    interval-ms: 3600000        # how often the retention cleanup runs (§8)
+    initial-delay-ms: 60000
+  gateway:
+    token: ${CHRONOS_GATEWAY_TOKEN:chronos-dev-token}  # connect-time auth token (§9)
+    compress: true                                     # gzip WS frames
+  alarm:
+    webhook-url: ${CHRONOS_ALARM_WEBHOOK_URL:}         # POST JSON on alarm (§10), empty = off
+    ntfy-url: ${CHRONOS_ALARM_NTFY_URL:}               # ntfy topic URL, empty = off
+  secret-key: ${CHRONOS_SECRET_KEY:}               # base64 32 bytes; ephemeral if unset (dev only)
+  security:
+    user: ${CHRONOS_API_USER:admin}                # §11 default ADMIN account (seeded if DB empty)
+    password: ${CHRONOS_API_PASSWORD:admin}         # change in production
+    # HS256 signing secret for JWTs (≥32 bytes). Set a stable value in prod so tokens survive restarts.
+    jwt-secret: ${CHRONOS_JWT_SECRET:chronos-dev-jwt-secret-change-me-please-0123456789}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics   # §11 observability (Phase 7)
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: chronos
+  # OpenTelemetry export (§11). Off by default (no endpoint); set OTEL_EXPORTER_OTLP_ENDPOINT
+  # (e.g. http://otel-collector:4318) to stream traces + metrics to a collector. App runs fine
+  # whether or not the collector is reachable.
+  tracing:
+    enabled: ${OTEL_ENABLED:false}
+    sampling:
+      probability: ${OTEL_TRACE_SAMPLING:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+    metrics:
+      export:
+        enabled: ${OTEL_ENABLED:false}
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+        step: 30s
+
+server:
+  shutdown: graceful       # §11 그레이스풀 셧다운

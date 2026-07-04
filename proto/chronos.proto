@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+// Chronos external gateway protocol (§9). Single source of truth — every SDK (Java/.NET/Python)
+// generates from this file. Evolve by ADDING fields; never renumber/reuse field numbers.
+
+package chronos.v1;
+
+option java_package = "io.chronos.proto";
+option java_multiple_files = true;
+option java_outer_classname = "ChronosProto";
+option csharp_namespace = "Chronos.Proto";
+
+// ---- client → server ----
+message ClientMessage {
+  oneof body {
+    Subscribe   subscribe   = 1; // subscribe to a node or specific tags
+    Unsubscribe unsubscribe = 2;
+    SnapshotReq snapshot    = 3; // point-in-time snapshot request
+    Heartbeat   heartbeat   = 4;
+  }
+}
+
+message Subscribe {
+  string node = 1;             // node name; empty = all
+  repeated string tags = 2;    // canonical tag keys; empty = all tags of the node
+}
+
+message Unsubscribe {
+  string node = 1;
+  repeated string tags = 2;
+}
+
+message SnapshotReq {
+  string correlation_id = 1;   // echoed back on the Snapshot response
+  string node = 2;             // node id
+  int64  at_epoch_millis = 3;  // instant to reconstruct
+  repeated string tags = 4;    // empty = all node tags
+}
+
+message Heartbeat {
+  int64 epoch_millis = 1;
+}
+
+// ---- server → client ----
+message ServerMessage {
+  oneof body {
+    TagUpdate update    = 1;   // one or more tag values (push)
+    Snapshot  snapshot  = 2;   // response to SnapshotReq
+    Error     error     = 3;
+    Heartbeat heartbeat = 4;
+  }
+}
+
+message TagValue {
+  string tag = 1;              // canonical key
+  string value = 2;            // string-encoded value (type per Tag.dataType)
+  Quality quality = 3;
+  int64  ts_epoch_millis = 4;
+}
+
+message TagUpdate {
+  string node = 1;
+  repeated TagValue values = 2;
+}
+
+message Snapshot {
+  string correlation_id = 1;
+  string node = 2;
+  int64  at_epoch_millis = 3;
+  repeated TagValue values = 4;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+enum Quality {
+  GOOD = 0;
+  BAD = 1;
+  STALE = 2;
+  UNCERTAIN = 3;
+}

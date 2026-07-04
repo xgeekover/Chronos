@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Java
+*.class
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/coverage/
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Local env / secrets (never commit credentials — 불변 규칙 4)
+.env
+*.local
+
+# Node-local SQLite time-series files (§8)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+data/
+
+# AI build-prompt (not part of the project source)
+claude-code-prompt-iot-historian.md
+
+# SDK build outputs
+sdk/sdk-python/dist/
+sdk/sdk-python/*.egg-info/
+sdk/sdk-dotnet/bin/
+sdk/sdk-dotnet/obj/
+**/*.nupkg

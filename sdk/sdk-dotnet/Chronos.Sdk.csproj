@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Chronos .NET SDK (§9). Build: `dotnet build` (or `dotnet pack` for the .dll/NuGet).
+       Grpc.Tools generates Chronos.Proto.* from the shared schema at build time. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Chronos.Sdk</RootNamespace>
+    <AssemblyName>Chronos.Sdk</AssemblyName>
+
+    <!-- NuGet package metadata — `dotnet pack -c Release` produces a publishable .nupkg. -->
+    <PackageId>Chronos.Sdk</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>Chronos</Authors>
+    <Description>Chronos IoT historian gateway client — subscribe to and query tags by name (§9).</Description>
+    <PackageTags>iot;historian;timeseries;scada;chronos</PackageTags>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/your-org/chronos</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/your-org/chronos</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.28.3" />
+    <PackageReference Include="Grpc.Tools" Version="2.68.0" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Single source of truth: the shared proto schema. -->
+    <Protobuf Include="..\..\proto\chronos.proto" ProtoRoot="..\..\proto" GrpcServices="None" />
+  </ItemGroup>
+
+</Project>

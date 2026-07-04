@@ -1,0 +1,60 @@
+# Publish the Chronos SDKs to their registries. Runs on a version tag (e.g. v0.1.0) or manual
+# dispatch. Each job needs the corresponding secret to be configured (see sdk/PUBLISHING.md);
+# without it the job's publish step fails fast, the others are unaffected.
+name: publish-sdks
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  python:
+    name: PyPI (chronos-sdk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - name: Build sdist + wheel
+        working-directory: sdk/sdk-python
+        run: python -m build
+      - name: Upload to PyPI
+        working-directory: sdk/sdk-python
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload dist/*
+
+  dotnet:
+    name: NuGet (Chronos.Sdk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Pack
+        run: dotnet pack sdk/sdk-dotnet/Chronos.Sdk.csproj -c Release -o nupkg
+      - name: Push to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push "nupkg/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  java:
+    name: Maven (io.chronos:sdk-java)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Publish
+        env:
+          CHRONOS_MAVEN_URL: ${{ vars.CHRONOS_MAVEN_URL }}
+          CHRONOS_MAVEN_USER: ${{ secrets.CHRONOS_MAVEN_USER }}
+          CHRONOS_MAVEN_PASSWORD: ${{ secrets.CHRONOS_MAVEN_PASSWORD }}
+        run: ./gradlew :sdk-java:publishMavenPublicationToRemoteRepository

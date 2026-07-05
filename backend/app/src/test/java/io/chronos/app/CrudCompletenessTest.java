@@ -30,11 +30,11 @@ class CrudCompletenessTest {
 
     @Test
     void deletingTagCascadesMappings() {
-        DeviceEntity device = devices.create("casc-dev", "HOST", "SCRIPT_JAVA", Map.of(), Map.of());
+        DeviceEntity device = devices.create("casc-dev", "HOST", "SYNTHETIC", Map.of(), Map.of());
         NodeEntity node = nodes.create("casc-node", "cascade", 24);
         TagEntity tag = tags.create(node.getId(), "t1", "NUMBER", null, null);
-        TaskEntity task = taskService.create(node.getId(), device.getId(), "SCRIPT_JAVA",
-                Map.of("script", "return java.util.Map.of(\"t1\", 1.0);"), "INTERVAL", 3_600_000L, null, 5_000);
+        TaskEntity task = taskService.create(node.getId(), device.getId(), "QUERY",
+                Map.of("t1", 1.0), "INTERVAL", 3_600_000L, null, 5_000);
         mappings.create(task.getId(), tag.getId(), Map.of("kind", "COLUMN", "expr", "t1"), Map.of());
 
         tags.delete(tag.getId());
@@ -44,11 +44,11 @@ class CrudCompletenessTest {
 
     @Test
     void deletingDeviceCascadesTasksAndMappings() {
-        DeviceEntity device = devices.create("cascdev-dev", "HOST", "SCRIPT_JAVA", Map.of(), Map.of());
+        DeviceEntity device = devices.create("cascdev-dev", "HOST", "SYNTHETIC", Map.of(), Map.of());
         NodeEntity node = nodes.create("cascdev-node", "cascade dev", 24);
         TagEntity tag = tags.create(node.getId(), "t2", "NUMBER", null, null);
-        TaskEntity task = taskService.create(node.getId(), device.getId(), "SCRIPT_JAVA",
-                Map.of("script", "return java.util.Map.of(\"t2\", 1.0);"), "INTERVAL", 3_600_000L, null, 5_000);
+        TaskEntity task = taskService.create(node.getId(), device.getId(), "QUERY",
+                Map.of("t2", 1.0), "INTERVAL", 3_600_000L, null, 5_000);
         mappings.create(task.getId(), tag.getId(), Map.of("kind", "COLUMN", "expr", "t2"), Map.of());
 
         devices.delete(device.getId());

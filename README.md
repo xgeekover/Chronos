@@ -3,7 +3,7 @@
 **Plugin-based industrial IoT data-collection & historian platform.**
 
 Chronos periodically collects from diverse industrial sources (SQL databases, files, shell commands,
-MQTT, Modbus, TCP, HTTP, Java scripts), normalizes everything into per-node **Tag(Key)–Value**
+MQTT, Modbus, TCP, HTTP), normalizes everything into per-node **Tag(Key)–Value**
 pairs, stores a per-node local time series (**Time Machine**), and lets external programs subscribe
 to live values over a **WebSocket + protobuf gateway** with Java / Python / .NET SDKs.
 
@@ -198,7 +198,6 @@ Chronos is a **Gradle multi-module** backend plus a React SPA, wired together on
 - **PostgreSQL 16** + **Flyway** migrations · **SQLite** per-node time series
 - **PF4J 3.15** — protocol adapters as hot-pluggable plugins
 - **GraalVM JS (`js-community` 24.1.1)** — sandboxed JavaScript Function node (`HostAccess.NONE`)
-- **Eclipse Compiler (ECJ)** — in-memory Java compile for the Java Function node validation
 - **Eclipse Paho** (MQTT) · **Jackson** (JSON) · **SnakeYAML** · **jsoup** (HTML) · **JGit** (flow versioning)
 - **protobuf** + WebSocket for the streaming gateway
 - **JWT (HS256)** auth · **AES-GCM** encryption of secrets at rest
@@ -210,7 +209,7 @@ Chronos is a **Gradle multi-module** backend plus a React SPA, wired together on
 - **Tailwind CSS v4** (design system in `ui/kit.tsx`)
 - **@xyflow/react (React Flow) 12** — the flow canvas
 - **TanStack Query 5** — server state / polling
-- **CodeMirror 6** (`@uiw/react-codemirror`, `lang-java`, `lang-javascript`, `lint`) — the Function-node editor
+- **CodeMirror 6** (`@uiw/react-codemirror`, `lang-javascript`, `lint`) — the Function-node editor
 - **Apache ECharts 6** — time-series charts
 - **Biome** (lint/format) · **Vitest** + Testing Library (tests)
 
@@ -365,6 +364,9 @@ subscribes by tag name over the WebSocket, and receives compressed protobuf fram
 > `device read` opens its own connection, pick a **registered device** (not inline) so the pool is
 > shared.
 
+**No hardware handy?** [`docs/examples/synthetic-demo.md`](docs/examples/synthetic-demo.md) builds a
+JS-only flow (`inject → function → tag`) that synthesizes moving live values — no device adapter needed.
+
 ---
 
 ## Node reference
@@ -427,7 +429,7 @@ shown here; common controls at the bottom of every dialog are **enabled** (skip 
 <table>
 <tr>
 <td width="320"><img src="docs/screenshots/nodes/function.png" alt="function node config dialog" width="300"></td>
-<td><b><code>function</code></b> — Transforms the message with your own code: <b>sandboxed JavaScript</b> (GraalVM) or <b>Java</b> (compiled in-memory). Live per-language syntax checking in a CodeMirror editor; <code>msg</code>/<code>node</code>/<code>flow</code>/<code>global</code>/<code>env</code> in scope; multiple outputs via <code>node.send([...])</code>. No JVM/file/network access from JS.</td>
+<td><b><code>function</code></b> — Transforms the message with your own code in <b>sandboxed JavaScript</b> (GraalVM, <code>HostAccess.NONE</code>). Live syntax checking in a CodeMirror editor; <code>msg</code>/<code>node</code>/<code>flow</code>/<code>global</code>/<code>env</code> in scope; multiple outputs via <code>node.send([...])</code>. No JVM/file/network access.</td>
 </tr>
 <tr>
 <td width="320"><img src="docs/screenshots/nodes/switch.png" alt="switch node config dialog" width="300"></td>
@@ -591,7 +593,7 @@ shown here; common controls at the bottom of every dialog are **enabled** (skip 
 </tr>
 <tr>
 <td width="320"><img src="docs/screenshots/nodes/deviceread.png" alt="device read node config dialog" width="300"></td>
-<td><b><code>device read</code> ★</b> — Runs a pull adapter (JDBC / Modbus / shell / file / API / Java script) on each incoming message and emits the raw result. Pick a <b>globally-registered device</b> to share one bounded connection pool (vs. inline config, which can fragment pools). <code>inject → device read → function → tag</code> is the canonical collection pattern.</td>
+<td><b><code>device read</code> ★</b> — Runs a pull adapter (JDBC / Modbus / shell / file / API) on each incoming message and emits the raw result. Pick a <b>globally-registered device</b> to share one bounded connection pool (vs. inline config, which can fragment pools). <code>inject → device read → function → tag</code> is the canonical collection pattern.</td>
 </tr>
 </table>
 
@@ -612,7 +614,7 @@ backend/
 frontend/          React 19 + Vite + Tailwind v4 + React Flow + CodeMirror + ECharts
 proto/             protobuf schema for the gateway wire format
 sdk/               sdk-java · sdk-python · sdk-dotnet
-docs/              architecture · adding-a-protocol · security · screenshots
+docs/              architecture · adding-a-protocol · security · screenshots · examples
 ```
 
 ---
@@ -654,7 +656,7 @@ docker compose build backend  && docker compose up -d backend
 - **Secrets are never stored in plaintext** — device/flow credentials are **AES-GCM** encrypted at
   rest and masked in API responses.
 - The **JavaScript Function node** runs in a GraalVM sandbox (`HostAccess.NONE`, no host classes,
-  no file/network); Java Function/script code is **trusted-admin** (ADMIN-only to author/deploy).
+  no file/network access) — the only in-flow code path, so there is no in-process Java compilation.
 - `POST /api/flows/in/**` is intentionally public (inbound webhooks for `http in` nodes).
 - The `file in` / `file out` nodes are confined to `CHRONOS_FLOW_FILES_DIR` (symlink-escape guarded).
 

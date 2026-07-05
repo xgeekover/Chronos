@@ -193,7 +193,7 @@ const NODE_HELP: Record<string, string> = {
     "Connects to a TCP host:port and emits each received line (auto-reconnects).",
   wsin: "Connects to a WebSocket URL and emits each text frame (auto-reconnects).",
   function:
-    "Runs JavaScript (sandboxed, Node-RED-style: msg/node/flow/global/env) or Java. Return msg or use node.send() for multiple outputs.",
+    "Runs sandboxed JavaScript (Node-RED-style: msg/node/flow/global/env). Return msg or use node.send() for multiple outputs.",
   change: "Applies set / change / delete / move rules to message properties.",
   switch:
     "Routes the message to an output per matching rule (operators or an expression).",
@@ -213,7 +213,7 @@ const NODE_HELP: Record<string, string> = {
   trigger: "Emits the input, then a configured payload after a delay.",
   exec: "Runs a system command; outputs stdout(0), stderr(1), return code(2).",
   deviceread:
-    "Runs a pull adapter (JDBC/Modbus/SHELL/FILE/API/SCRIPT_JAVA) on each input → emits the raw result. Wire an inject timer in to poll on a schedule.",
+    "Runs a pull adapter (JDBC/Modbus/SHELL/FILE/API) on each input → emits the raw result. Wire an inject timer in to poll on a schedule.",
   udpin: "Binds a UDP port and emits each received datagram as payload.",
   udpout: "Sends msg.payload as a UDP datagram to host:port.",
   filein: "Reads a file (under the flow files dir) into msg.payload.",
@@ -460,7 +460,7 @@ function summary(type: string, c: Cfg): string {
     case "subflow":
       return String(c.name ?? "subflow");
     case "function":
-      return c.lang === "js" ? "JS fn" : "Java fn";
+      return "JS fn";
     case "httprequest":
       return `${c.method} ${c.url}`;
     case "soaprequest":
@@ -3248,11 +3248,9 @@ function FlowEditDialog({
                 value={String(c.adapterType ?? "JDBC")}
                 onChange={(e) => set("adapterType", e.target.value)}
               >
-                {["JDBC", "MODBUS", "SHELL", "FILE", "API", "SCRIPT_JAVA"].map(
-                  (o) => (
-                    <option key={o}>{o}</option>
-                  ),
-                )}
+                {["JDBC", "MODBUS", "SHELL", "FILE", "API"].map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
               </select>
             </L>
           )}
@@ -3262,13 +3260,7 @@ function FlowEditDialog({
               value={String(c.taskType ?? "QUERY")}
               onChange={(e) => set("taskType", e.target.value)}
             >
-              {[
-                "QUERY",
-                "MODBUS_READ",
-                "SHELL",
-                "FILE_READ",
-                "SCRIPT_JAVA",
-              ].map((o) => (
+              {["QUERY", "MODBUS_READ", "SHELL", "FILE_READ"].map((o) => (
                 <option key={o}>{o}</option>
               ))}
             </select>
@@ -3402,25 +3394,8 @@ function FlowEditDialog({
       )}
       {t === "function" && (
         <>
-          <L label="language">
-            <select
-              className={inp}
-              value={String(c.lang ?? "java")}
-              onChange={(e) => set("lang", e.target.value)}
-            >
-              <option value="js">JavaScript (sandboxed)</option>
-              <option value="java">Java</option>
-            </select>
-          </L>
-          <L
-            label={
-              String(c.lang ?? "java") === "js"
-                ? "code — msg, node, flow, global, env in scope"
-                : "code — run(Map msg, Map flow, Map global)"
-            }
-          >
+          <L label="code — msg, node, flow, global, env in scope">
             <FunctionCodeField
-              lang={String(c.lang ?? "java") === "js" ? "js" : "java"}
               value={String(c.code ?? "")}
               onChange={(v) => set("code", v)}
               height={expanded ? "62vh" : "16rem"}
@@ -3431,23 +3406,12 @@ function FlowEditDialog({
             {text("outputs", "outputs")}
           </div>
           <p className="text-[10px] leading-relaxed text-zinc-500">
-            {String(c.lang ?? "java") === "js" ? (
-              <>
-                Node-RED-style: mutate <span className="font-mono">msg</span>{" "}
-                and <span className="font-mono">return msg</span>, or use{" "}
-                <span className="font-mono">node.send([m1,m2])</span> for
-                multiple outputs,{" "}
-                <span className="font-mono">flow.get/set</span>,{" "}
-                <span className="font-mono">node.status/error/warn</span>. Runs
-                in a sandbox (no JVM/file/network access).
-              </>
-            ) : (
-              <>
-                For multiple outputs, return an{" "}
-                <span className="font-mono">Object[]</span> — element i goes to
-                port i (null skips a port).
-              </>
-            )}
+            Node-RED-style: mutate <span className="font-mono">msg</span> and{" "}
+            <span className="font-mono">return msg</span>, or use{" "}
+            <span className="font-mono">node.send([m1,m2])</span> for multiple
+            outputs, <span className="font-mono">flow.get/set</span>,{" "}
+            <span className="font-mono">node.status/error/warn</span>. Runs in a
+            sandbox (no JVM/file/network access).
           </p>
         </>
       )}

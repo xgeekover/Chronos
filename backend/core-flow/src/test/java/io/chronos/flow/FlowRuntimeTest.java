@@ -104,7 +104,7 @@ class FlowRuntimeTest {
                 List.of(
                         new NodeDef("i", "inject", Map.of("payload", 5)),
                         new NodeDef("f", "function",
-                                Map.of("code", "return ((Number)msg.get(\"payload\")).intValue() * 2;")),
+                                Map.of("code", "return msg.payload * 2;")),
                         new NodeDef("dbg", "debug", Map.of())),
                 List.of(new WireDef("i", 0, "f"), new WireDef("f", 0, "dbg")));
         var rt = new FlowRuntime();
@@ -171,8 +171,8 @@ class FlowRuntimeTest {
                 List.of(
                         new NodeDef("i", "inject", Map.of("once", false, "payload", 1)),
                         new NodeDef("f", "function", Map.of("code",
-                                "int n = ((Number) flow.getOrDefault(\"count\", 0)).intValue() + 1;"
-                                + " flow.put(\"count\", n); return n;")),
+                                "var n = (flow.get(\"count\") || 0) + 1;"
+                                + " flow.set(\"count\", n); return n;")),
                         new NodeDef("dbg", "debug", Map.of())),
                 List.of(new WireDef("i", 0, "f"), new WireDef("f", 0, "dbg")));
         var rt = new FlowRuntime();
@@ -412,12 +412,12 @@ class FlowRuntimeTest {
 
     @Test
     void functionMultiOutputRoutesArrayElementsToPorts() throws Exception {
-        // return [null, payload] → nothing on port 0, msg on port 1
+        // node.send([null, {payload}]) → nothing on port 0, msg on port 1
         var graph = new FlowGraph(
                 List.of(
                         new NodeDef("i", "inject", Map.of("payload", 5)),
                         new NodeDef("f", "function", Map.of("code",
-                                "return new Object[]{ null, ((Number)msg.get(\"payload\")).intValue() * 10 };")),
+                                "node.send([null, { payload: msg.payload * 10 }]);")),
                         new NodeDef("p0", "debug", Map.of("name", "p0")),
                         new NodeDef("p1", "debug", Map.of("name", "p1"))),
                 List.of(new WireDef("i", 0, "f"), new WireDef("f", 0, "p0"),
@@ -494,7 +494,7 @@ class FlowRuntimeTest {
                 List.of(
                         new NodeDef("i", "inject", Map.of("payload", 1)),
                         new NodeDef("f", "function",
-                                Map.of("code", "throw new RuntimeException(\"boom\");")),
+                                Map.of("code", "throw new Error(\"boom\");")),
                         new NodeDef("c", "catch", Map.of()), // empty scope = catch all
                         new NodeDef("dbg", "debug", Map.of("name", "err", "property", "$msg"))),
                 List.of(new WireDef("i", 0, "f"), new WireDef("c", 0, "dbg")));

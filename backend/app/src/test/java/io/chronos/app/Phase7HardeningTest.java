@@ -89,12 +89,12 @@ class Phase7HardeningTest {
 
     @Test
     void prometheusExposesChronosMetrics() throws Exception {
-        // generate a collection metric via the script adapter (no external source)
-        DeviceEntity device = devices.create("p7-script", "HOST", "SCRIPT_JAVA", Map.of(), Map.of());
+        // generate a collection metric via the synthetic adapter (no external source)
+        DeviceEntity device = devices.create("p7-script", "HOST", "SYNTHETIC", Map.of(), Map.of());
         NodeEntity node = nodes.create("p7node", "phase7", 24);
         TagEntity tag = tags.create(node.getId(), "v", "NUMBER", null, null);
-        TaskEntity task = taskService.create(node.getId(), device.getId(), "SCRIPT_JAVA",
-                Map.of("script", "return java.util.Map.of(\"v\", 1.0);"), "INTERVAL", 3_600_000L, null, 5_000);
+        TaskEntity task = taskService.create(node.getId(), device.getId(), "QUERY",
+                Map.of("v", 1.0), "INTERVAL", 3_600_000L, null, 5_000);
         mappings.create(task.getId(), tag.getId(), Map.of("kind", "COLUMN", "expr", "v"), Map.of());
         collection.runTaskNow(task.getId());
 

@@ -24,7 +24,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
 /**
- * Phase 6 E2E: a SCRIPT_JAVA task run (returns 35.0, no external source) flows through the pipeline,
+ * Phase 6 E2E: a synthetic-adapter task run (returns 35.0, no external source) flows through the pipeline,
  * the run is logged, and the dashboard reflects the collection activity (§10).
  */
 @SpringBootTest
@@ -41,13 +41,13 @@ class Phase6IntegrationTest {
     @Autowired DashboardController dashboard;
 
     @Test
-    void scriptRunLogsAndDashboard() {
-        DeviceEntity device = devices.create("script-e2e", "HOST", "SCRIPT_JAVA", Map.of(), Map.of());
-        NodeEntity node = nodes.create("scriptnode", "script e2e", 24);
+    void collectionRunLogsAndDashboard() {
+        DeviceEntity device = devices.create("synthetic-e2e", "HOST", "SYNTHETIC", Map.of(), Map.of());
+        NodeEntity node = nodes.create("scriptnode", "collection e2e", 24);
         TagEntity temp = tags.create(node.getId(), "temp", "NUMBER", "C", null);
 
-        TaskEntity task = taskService.create(node.getId(), device.getId(), "SCRIPT_JAVA",
-                Map.of("script", "return java.util.Map.of(\"temp\", 35.0);"), "INTERVAL", 3_600_000L, null, 5_000);
+        TaskEntity task = taskService.create(node.getId(), device.getId(), "QUERY",
+                Map.of("temp", 35.0), "INTERVAL", 3_600_000L, null, 5_000);
         mappings.create(task.getId(), temp.getId(), Map.of("kind", "COLUMN", "expr", "temp"), Map.of());
 
         CollectionResult result = collection.runTaskNow(task.getId());

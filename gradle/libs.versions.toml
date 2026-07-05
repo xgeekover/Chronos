@@ -11,7 +11,6 @@ ojdbc = "23.26.2.0.0"
 mssql = "13.4.0.jre11"
 hikari = "7.0.2"
 jsonpath = "2.10.0"
-ecj = "3.46.0"
 sshd = "2.18.0"
 protobuf = "4.35.1"
 protobufPlugin = "0.10.0"
@@ -34,7 +33,6 @@ ojdbc11 = { module = "com.oracle.database.jdbc:ojdbc11", version.ref = "ojdbc" }
 mssql-jdbc = { module = "com.microsoft.sqlserver:mssql-jdbc", version.ref = "mssql" }
 hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 json-path = { module = "com.jayway.jsonpath:json-path", version.ref = "jsonpath" }
-ecj = { module = "org.eclipse.jdt:ecj", version.ref = "ecj" }
 sshd-core = { module = "org.apache.sshd:sshd-core", version.ref = "sshd" }
 protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
 paho-mqtt = { module = "org.eclipse.paho:org.eclipse.paho.client.mqttv3", version.ref = "paho" }

@@ -38,7 +38,6 @@ dependencies {
     runtimeOnly(project(":adapters:adapter-file"))
     runtimeOnly(project(":adapters:adapter-api"))
     runtimeOnly(project(":adapters:adapter-shell"))
-    runtimeOnly(project(":adapters:adapter-script"))
     runtimeOnly(project(":adapters:adapter-mqtt"))
     runtimeOnly(project(":adapters:adapter-modbus"))
     runtimeOnly(project(":adapters:adapter-tcp"))

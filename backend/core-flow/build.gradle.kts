@@ -1,8 +1,6 @@
 // core-flow — a Node-RED-style message-passing flow runtime (ADR-001: pure JDK, no Spring, framework-
 // free so it stays testable in isolation like core-engine). The app module wires it behind REST.
 dependencies {
-    // ECJ powers the `function` node (compile Java on a plain JRE, ADR-005); HTTP uses the JDK client.
-    implementation(libs.ecj)
     // Eclipse Paho for the mqtt in/out nodes (same client the historian's MQTT adapter uses).
     implementation(libs.paho.mqtt)
     // GraalVM polyglot + GraalJS power the JavaScript `function` node (Node-RED-style), sandboxed with

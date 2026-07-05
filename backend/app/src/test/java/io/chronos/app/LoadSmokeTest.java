@@ -38,11 +38,11 @@ class LoadSmokeTest {
 
     @Test
     void manyConcurrentCollectionsAllSucceed() throws Exception {
-        DeviceEntity device = devices.create("load-script", "HOST", "SCRIPT_JAVA", Map.of(), Map.of());
+        DeviceEntity device = devices.create("load-script", "HOST", "SYNTHETIC", Map.of(), Map.of());
         NodeEntity node = nodes.create("loadnode", "load smoke", 24);
         TagEntity tag = tags.create(node.getId(), "v", "NUMBER", null, null);
-        TaskEntity task = taskService.create(node.getId(), device.getId(), "SCRIPT_JAVA",
-                Map.of("script", "return java.util.Map.of(\"v\", 7.0);"), "INTERVAL", 3_600_000L, null, 5_000);
+        TaskEntity task = taskService.create(node.getId(), device.getId(), "QUERY",
+                Map.of("v", 7.0), "INTERVAL", 3_600_000L, null, 5_000);
         mappings.create(task.getId(), tag.getId(), Map.of("kind", "COLUMN", "expr", "v"), Map.of());
 
         int runs = 50;

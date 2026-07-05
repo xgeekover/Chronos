@@ -40,7 +40,7 @@ agreed in Phase 0.
 | `core-engine` | pipeline, plugin runtime, history store, current-value cache | `core-api` |
 | `app` | Spring Boot: REST/WS, metadata persistence, security, wiring | `core-engine` |
 | `gateway` | external WS + protobuf gateway for the SDKs | `core-engine` |
-| `adapters/adapter-*` | protocol plugins (jdbc/file/shell/api/script) | **`core-api` only** |
+| `adapters/adapter-*` | protocol plugins (jdbc/file/shell/api/mqtt/modbus/tcp) | **`core-api` only** |
 
 Adapters must never depend on `core-engine`/`app` (invariant rule 2). This is what keeps
 "drop a JAR to add a protocol" true.
@@ -53,7 +53,7 @@ Adapters must never depend on `core-engine`/`app` (invariant rule 2). This is wh
 | 002 | **FE/BE physically separate**; Gradle build covers backend only, frontend builds via pnpm. | Invariant rule 1; independent deploy/scale. | Two toolchains, two CI jobs. |
 | 003 | Scheduler = **Quartz**, per-Task interval/cron, dynamic register/unregister. Phase 2 uses the in-memory job store + startup re-scheduling from the metadata DB. | Per-Task dynamic scheduling. | In-memory store isn't clustered; switch to the JDBC JobStore when multi-instance is needed. |
 | 004 | Time Machine = **SQLite file per node** (WAL) behind the `HistoryStore` SPI. | Node isolation, portability, simple retention. | Single-writer per node. Alt: DuckDB (analytics) / RocksDB (write throughput). |
-| 005 | Dynamic script = **Groovy + SecureASTCustomizer whitelist + timeout + thread/mem limits + isolated classloader**. | Phase 4 scope, fast start. | ⚠️ in-process is **not** a true sandbox; untrusted input needs process/container isolation. See `security.md`. |
+| 005 | Dynamic code in flows = **sandboxed GraalVM JavaScript** (`HostAccess.NONE`) in the Function node. | One scripting language; a genuine sandbox, not a blocklist. | Superseded the earlier in-process Java (Java Function option + `SCRIPT_JAVA` adapter), which were **removed**. |
 | 006 | Shell = **Apache MINA SSHD** (remote) + `ProcessBuilder` (local), command allowlist + argument separation + timeout. | Invariant + injection safety. | allowlist operational burden. |
 | 007 | External protocol = **Protobuf over WebSocket**, per-frame **LZ4 (default) / gzip**. | multi-language codegen, compact payloads. | proto evolution discipline (immutable field numbers). |
 | 008 | Credentials = **AES-GCM (256)** with DEK/KEK envelope; KEK externalized (env/Vault). | no plaintext, key rotation. | env-only key is an operational risk. |
@@ -80,7 +80,7 @@ Adapters must never depend on `core-engine`/`app` (invariant rule 2). This is wh
   snapshot at a past instant returns the historical value, not the latest).
 - **Phase 4** — remaining adapters + PF4J plugins: `adapter-file`, `adapter-api` (JDK HttpClient),
   `adapter-shell` (local ProcessBuilder + remote MINA SSHD; allowlist + arg-array + timeout +
-  output cap), `adapter-script` (Groovy + SecureASTCustomizer whitelist + timeout). Parser gained
+  output cap). Parser gained
   JSONPATH/REGEX extractors. All adapters are `@Extension` PF4J plugins (generated
   `extensions.idx`) and ServiceLoader built-ins; the app merges built-ins + dropped plugin JARs
   via `CompositePluginRuntime` (`chronos.plugins.dir`). ✅ core-unmodified drop-in proven by
@@ -94,7 +94,7 @@ Adapters must never depend on `core-engine`/`app` (invariant rule 2). This is wh
   source (no local toolchain). Each SDK has a 5-line Quickstart. ✅
 - **Phase 6** — dashboard / logs: per-run `collection_log` persistence + logs API; dashboard
   summary (inventory counts + collection success rate + live-value count). FE gains a Dashboard
-  and a Logs view. ✅ verified by tests + a live demo (script run → logged → dashboard).
+  and a Logs view. ✅ verified by tests + a live demo (collection run → logged → dashboard).
 - **Phase 7** — hardening / deploy: **Micrometer + Prometheus** metrics (collections,
   gateway subscriptions) at `/actuator/prometheus`; **Spring Security** HTTP Basic over `/api/**`
   (health/prometheus + gateway WS open); **docker-compose** packaging (postgres + backend image +

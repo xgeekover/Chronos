@@ -236,11 +236,6 @@ export const api = {
     ),
   dashboard: () => http<DashboardSummary>("/dashboard/summary"),
   logs: () => http<CollectionLog[]>("/logs?limit=100"),
-  validateScript: (script: string) =>
-    http<ScriptValidation>("/scripts/validate", {
-      method: "POST",
-      body: JSON.stringify({ script }),
-    }),
   // Node-RED-style flow runtime (core-flow) — many flows run at once, keyed by flowId
   runFlow: (graph: unknown, flowId: string, name?: string) => {
     const params = new URLSearchParams({ flowId });
@@ -397,10 +392,4 @@ export interface FlowDebugRecord {
   name: string;
   topic?: unknown;
   payload?: unknown;
-}
-
-export interface ScriptValidation {
-  valid: boolean;
-  error?: string;
-  line?: number;
 }

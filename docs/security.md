@@ -14,17 +14,14 @@ explicitly. Implementations land in later phases; this is the standing risk regi
   - `Secrets.toString()` masks all values; structured logging masks secret keys.
   - `.env` and `*.local` are git-ignored.
 
-## 2. Dynamic script execution — Groovy (Phase 4)
+## 2. Dynamic code execution — sandboxed JavaScript (flow Function node)
 
-- **Risk (high):** arbitrary code execution. In-process Groovy is **not** a true sandbox —
-  CPU/memory exhaustion, reflection escapes, and classloader tricks are possible.
-- **Mitigations (v1, trusted-admin input):**
-  - `SecureASTCustomizer` compile-time whitelist (allowed imports/receivers/statements).
-  - Execution **timeout** + thread interruption.
-  - Isolated classloader; no ambient access to engine internals.
-  - Audit log of every script create/edit/run.
-- **If untrusted input is ever required:** move execution to a **separate process / container**
-  with seccomp + cgroups CPU/memory limits and an IPC boundary. Tracked for Phase 7 hardening.
+- **Design:** the flow **Function** node runs user JavaScript in a **GraalVM sandbox** with
+  `HostAccess.NONE` and host class lookup denied — no access to the JVM, filesystem, or network.
+  Each message runs under a **timeout**; a stuck guest is interrupted and its context rebuilt.
+- Because this is a genuine sandbox (not a source-level blocklist), it needs no allow/deny list.
+  The earlier in-process **Java** code paths — the Java Function option and the `SCRIPT_JAVA`
+  device adapter — were **removed** in favour of this single sandboxed language.
 
 ## 3. Shell / remote command execution (Phase 4)
 
@@ -38,8 +35,8 @@ explicitly. Implementations land in later phases; this is the standing risk regi
 
 ## Cross-cutting
 
-- **RBAC:** ADMIN / OPERATOR / VIEWER (`app_user.role`). Mutating config and running scripts/
-  shell require elevated roles.
+- **RBAC:** ADMIN / OPERATOR / VIEWER (`app_user.role`). Mutating config and running shell
+  commands require elevated roles.
 - **Transport/auth:** FE→BE JWT; external WS/SDK token auth on connect.
 - **Audit:** `audit_log` records actor/action/target for sensitive operations.
 - **Network:** metadata DB is separate from any collected source DB.
@@ -52,11 +49,11 @@ explicitly. Implementations land in later phases; this is the standing risk regi
 | Gateway auth | connect-time **token** (`chronos.gateway.token`) | per-tenant / RBAC-scoped tokens |
 | Secrets | **AES-GCM** at rest, masked in logs, never returned by the API (`@JsonIgnore`) | KEK in Vault/KMS (currently env) |
 | Shell adapter | **allowlist + arg-array + timeout + output cap**; SSH host-key = AcceptAll | pin `known_hosts` in production |
-| Script adapter | **Pure Java** compiled in-memory with ECJ (works on a JRE), run under a source-level **blocklist** (Runtime/ProcessBuilder/reflection/file/socket/exit) + **timeout** | ⚠️ in-process Java ≠ true sandbox → process/container isolation for untrusted input (the blocklist is best-effort defense-in-depth) |
+| Function node (flows) | user **JavaScript** in a **GraalVM sandbox** (`HostAccess.NONE`, no host classes, no file/network) + per-message **timeout** | true sandbox; no in-process Java compilation remains (Java Function + `SCRIPT_JAVA` adapter removed) |
 | Actuator | only `health`/`info`/`prometheus` exposed; rest authenticated | scrape endpoint network-restricted in prod |
 | Transport | same-origin via FE/nginx proxy (no CORS surface) | TLS termination at the edge (compose is plain HTTP) |
 
 **Review checklist (run before release):** no plaintext secrets in DB/logs ✓ · API requires auth
 ✓ (`Phase7HardeningTest`) · gateway rejects bad token ✓ (handshake) · shell allowlist enforced ✓
-(`adapter-shell` tests) · script sandbox blocks `System`/`Runtime` ✓ (`adapter-script` tests) ·
+(`adapter-shell` tests) · JS Function sandbox denies host access ✓ (`JsFunctionTest`) ·
 audit logging of sensitive ops ☐ (planned) · dependency CVE scan ☐ (wire to CI).

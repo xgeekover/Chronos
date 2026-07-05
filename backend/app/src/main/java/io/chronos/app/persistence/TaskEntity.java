@@ -30,7 +30,7 @@ public class TaskEntity {
     private UUID deviceId;
 
     @Column(nullable = false)
-    private String type; // QUERY | FILE_READ | API_CALL | SHELL | SCRIPT_JAVA
+    private String type; // QUERY | FILE_READ | API_CALL | SHELL | MQTT_SUBSCRIBE | MODBUS_READ | TCP_READ
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)

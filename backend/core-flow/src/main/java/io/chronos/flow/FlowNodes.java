@@ -54,6 +54,16 @@ final class FlowNodes {
     private static final HttpClient HTTP =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
+    /**
+     * Shared daemon pool that runs user {@code function}/{@code exec}/{@code device read} code off the
+     * single flow worker thread, so a slow call can be timed out without blocking the whole flow.
+     */
+    static final ExecutorService FN_EXEC = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r, "chronos-flow-fn");
+        t.setDaemon(true);
+        return t;
+    });
+
     static FlowNode create(
             FlowGraph.NodeDef def,
             ScheduledExecutorService sched,
@@ -73,9 +83,7 @@ final class FlowNodes {
             case "template" -> new Template(c, flowCtx, globalCtx, env);
             case "range" -> new Range(c);
             case "delay" -> new Delay(c, sched);
-            case "function" -> "js".equalsIgnoreCase(strOr(c.get("lang"), "java"))
-                    ? new JsFunc(def.id(), c, flowCtx, globalCtx, env, debug, seq)
-                    : new Func(c, flowCtx, globalCtx);
+            case "function" -> new JsFunc(def.id(), c, flowCtx, globalCtx, env, debug, seq);
             case "httprequest" -> new HttpReq(c);
             case "soaprequest" -> new Soap(c);
             case "split" -> new Split(c);
@@ -444,73 +452,6 @@ final class FlowNodes {
         }
     }
 
-    // ───────── function: arbitrary Java run(msg, flow, global) with a per-message timeout ─────────
-    static final class Func implements FlowNode {
-        // shared daemon pool: runs user function code off the flow worker so a slow fn can be timed out
-        static final ExecutorService FN_EXEC = Executors.newCachedThreadPool(r -> {
-            Thread t = new Thread(r, "chronos-flow-fn");
-            t.setDaemon(true);
-            return t;
-        });
-
-        private final FlowFunction fn;
-        private final Map<String, Object> flow;
-        private final Map<String, Object> global;
-        private final long timeoutMs;
-
-        Func(Map<String, Object> c, Map<String, Object> flow, Map<String, Object> global) {
-            fn = new FlowFunction(strOr(c.get("code"), "return msg.get(\"payload\");"));
-            this.flow = flow;
-            this.global = global;
-            this.timeoutMs = longOr(c.get("timeoutMs"), 5000);
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public void onMessage(FlowMsg msg, Emit emit) {
-            Map<String, Object> mutable = new LinkedHashMap<>(msg.props());
-            var future = FN_EXEC.submit(() -> fn.run(mutable, flow, global));
-            try {
-                Object r = future.get(timeoutMs, TimeUnit.MILLISECONDS);
-                // a returned array/List means multi-output: element i → port i (null skips that port)
-                List<?> ports = null;
-                if (r instanceof List<?> l) {
-                    ports = l;
-                } else if (r instanceof Object[] arr) {
-                    List<Object> tmp = new ArrayList<>();
-                    for (Object o : arr) {
-                        tmp.add(o);
-                    }
-                    ports = tmp;
-                }
-                if (ports != null) {
-                    for (int i = 0; i < ports.size(); i++) {
-                        Object el = ports.get(i);
-                        if (el == null) {
-                            continue;
-                        }
-                        if (el instanceof Map<?, ?> mm) {
-                            emit.send(i, new FlowMsg((Map<String, Object>) mm));
-                        } else {
-                            emit.send(i, new FlowMsg(mutable).set("payload", el));
-                        }
-                    }
-                } else if (r instanceof Map<?, ?> m) {
-                    emit.send(0, new FlowMsg((Map<String, Object>) m));
-                } else {
-                    emit.send(0, new FlowMsg(mutable).set("payload", r));
-                }
-            } catch (java.util.concurrent.TimeoutException te) {
-                future.cancel(true); // interrupt the runaway task instead of leaking the FN_EXEC thread
-                emit.error(new FlowMsg(mutable), "function timed out after " + timeoutMs + "ms");
-            } catch (Exception e) {
-                Throwable cause = e.getCause() != null ? e.getCause() : e;
-                emit.error(new FlowMsg(mutable),
-                        cause.getMessage() == null ? cause.toString() : cause.getMessage());
-            }
-        }
-    }
-
     // ───────── js function: sandboxed GraalJS run(msg,node,flow,global,env) (Node-RED-style) ─────────
     static final class JsFunc implements FlowNode {
         private final String id;
@@ -565,7 +506,7 @@ final class FlowNodes {
                             seq.incrementAndGet(), System.currentTimeMillis(), id, name, "warn", text));
                 }
             };
-            var future = Func.FN_EXEC.submit(() -> {
+            var future = FN_EXEC.submit(() -> {
                 js.run(mutable, flow, global, env, sink);
                 return null;
             });
@@ -821,7 +762,7 @@ final class FlowNodes {
 
         @Override
         public void onMessage(FlowMsg msg, Emit emit) {
-            Func.FN_EXEC.submit(() -> {
+            FN_EXEC.submit(() -> {
                 try {
                     emit.send(0, msg.set("payload", read.apply(config)));
                 } catch (Exception e) {
@@ -1641,7 +1582,7 @@ final class FlowNodes {
             }
             // run the whole process off the single flow worker so a slow/blocking child can't freeze the
             // runtime; stdout+stderr are drained on separate threads to avoid a pipe-buffer deadlock.
-            Func.FN_EXEC.submit(() -> runProcess(msg, emit));
+            FN_EXEC.submit(() -> runProcess(msg, emit));
         }
 
         private void runProcess(FlowMsg msg, Emit emit) {
@@ -1659,9 +1600,9 @@ final class FlowNodes {
                 }
                 proc = new ProcessBuilder(cmd).start();
                 final Process p = proc;
-                var outFut = Func.FN_EXEC.submit(
+                var outFut = FN_EXEC.submit(
                         () -> new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8));
-                var errFut = Func.FN_EXEC.submit(
+                var errFut = FN_EXEC.submit(
                         () -> new String(p.getErrorStream().readAllBytes(), StandardCharsets.UTF_8));
                 if (!proc.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
                     proc.destroyForcibly();

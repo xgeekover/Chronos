@@ -6,7 +6,6 @@ public enum TaskType {
     FILE_READ,
     API_CALL,
     SHELL,
-    SCRIPT_JAVA,
     MQTT_SUBSCRIBE,
     MODBUS_READ,
     TCP_READ

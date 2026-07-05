@@ -16,7 +16,6 @@ include(
     "adapters:adapter-file",
     "adapters:adapter-shell",
     "adapters:adapter-api",
-    "adapters:adapter-script",
     "adapters:adapter-mqtt",
     "adapters:adapter-modbus",
     "adapters:adapter-tcp",
@@ -33,7 +32,6 @@ project(":adapters:adapter-jdbc").projectDir = file("backend/adapters/adapter-jd
 project(":adapters:adapter-file").projectDir = file("backend/adapters/adapter-file")
 project(":adapters:adapter-shell").projectDir = file("backend/adapters/adapter-shell")
 project(":adapters:adapter-api").projectDir = file("backend/adapters/adapter-api")
-project(":adapters:adapter-script").projectDir = file("backend/adapters/adapter-script")
 project(":adapters:adapter-mqtt").projectDir = file("backend/adapters/adapter-mqtt")
 project(":adapters:adapter-modbus").projectDir = file("backend/adapters/adapter-modbus")
 project(":adapters:adapter-tcp").projectDir = file("backend/adapters/adapter-tcp")
